@@ -229,6 +229,10 @@ export const createServer = () => {
         redirect: "follow" as RequestRedirect,
       };
 
+      console.log("Fetching GitHub repositories for user:", username);
+      console.log("GitHub URL:", githubUrl);
+      console.log("Request options:", requestOptions);
+
       const githubResponse = await fetch(githubUrl, requestOptions);
 
       console.log("GitHub response status:", githubResponse.status);
