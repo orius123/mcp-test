@@ -270,10 +270,19 @@ export const createServer = () => {
     async ({ input }, { authInfo }) => {
       if (!authInfo?.scopes.includes("app:custom")) {
         console.log("You are not authorized");
-        throw new McpError(
-          ErrorCode.InvalidRequest,
-          "Insufficient permissions: 'app:custom' scope required"
-        );
+        return {
+          isError: true,
+          code: 403,
+          headers: {
+            "WWW-Authenticate": `Bearer scope="app:custom"`,
+          },
+          content: [
+            {
+              type: "text",
+              text: "You are not authorized to use this tool. Please ensure you have the 'app:custom' scope.",
+            },
+          ],
+        };
       }
       console.log("Received echo request with input:", input);
       return {
@@ -281,6 +290,101 @@ export const createServer = () => {
           {
             type: "text",
             text: `You said: ${input}`,
+          },
+        ],
+      };
+    }
+  );
+
+  // tool to create a gh repo
+  server.tool(
+    "create-gh-repo",
+    "Create a new GitHub repository",
+    {
+      name: z
+        .string()
+        .min(1, "Repository name must not be empty")
+        .describe("Name of the repository to create"),
+      description: z
+        .string()
+        .optional()
+        .describe("Description of the repository"),
+    },
+    async ({ name, description }, { authInfo }) => {
+      if (!authInfo?.scopes.includes("app:write")) {
+        console.log("You are not authorized");
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          "Insufficient permissions: 'app:write' scope required"
+        );
+      }
+
+      const userId = getSubFromJwt(authInfo.token);
+      console.log("Going to fetch token with: ", { appId: "github", userId });
+
+      const response = await fetch(
+        "https://asaf.descope.team/v1/mgmt/outbound/app/user/token/latest",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.DESCOPE_PROJECT_ID}:${authInfo.token}`,
+          },
+          body: JSON.stringify({ appId: "github", userId }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to fetch outbound token: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const tokenData = await response.json();
+      console.log("Fetched outbound token successfully, res:", tokenData);
+
+      // Create GitHub repository
+      const githubUrl = "https://api.github.com/user/repos";
+
+      const myHeaders = new Headers();
+      myHeaders.append(
+        "Authorization",
+        "Bearer " + tokenData.token.accessToken
+      );
+      myHeaders.append("Content-Type", "application/json");
+
+      const requestBody = JSON.stringify({
+        name,
+        description,
+        private: false, // Change to true if you want a private repo
+      });
+
+      const requestOptions = {
+        method: "POST",
+        headers: myHeaders,
+        body: requestBody,
+        redirect: "follow" as RequestRedirect,
+      };
+
+      console.log("Creating GitHub repository with options:", requestOptions);
+
+      const githubResponse = await fetch(githubUrl, requestOptions);
+
+      if (!githubResponse.ok) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to create repository: ${githubResponse.status} ${githubResponse.statusText}`
+        );
+      }
+
+      const createdRepo = await githubResponse.json();
+      console.log("Repository created successfully:", createdRepo);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Repository '${createdRepo.name}' created successfully!`,
           },
         ],
       };
