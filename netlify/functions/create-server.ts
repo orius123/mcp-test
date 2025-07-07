@@ -168,7 +168,7 @@ export const createServer = () => {
       const userId = getSubFromJwt(authInfo.token);
       console.log("Going to fetch token with: ", { appId, userId });
       const res = await descope.management.outboundApplication.fetchToken(
-        appId,
+        "github",
         userId
       );
       console.log("Fetched outbound token successfully, res:", res);
