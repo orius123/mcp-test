@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import createSdk from "@descope/node-sdk";
 
 const NWS_API_BASE = "https://api.weather.gov";
 const USER_AGENT = "weather-app/1.0";
@@ -72,6 +73,63 @@ interface ForecastResponse {
   };
 }
 
+// Helper function to decode JWT unsafely and extract the sub claim
+function getSubFromJwt(jwt: string): string {
+  try {
+    // Split the JWT into its three parts
+    const parts = jwt.split(".");
+
+    if (parts.length !== 3) {
+      throw new Error("Invalid JWT format");
+    }
+
+    // Decode the payload (second part)
+    const payload = parts[1];
+
+    // Add padding if needed for base64 decoding
+    const paddedPayload = payload + "=".repeat((4 - (payload.length % 4)) % 4);
+
+    // Decode base64 and parse JSON
+    const decodedPayload = JSON.parse(
+      Buffer.from(paddedPayload, "base64").toString("utf-8")
+    );
+
+    if (!decodedPayload.sub) {
+      throw new Error("No sub claim found in JWT");
+    }
+
+    return decodedPayload.sub;
+  } catch (error) {
+    console.error("Error decoding JWT:", error);
+    throw new McpError(
+      ErrorCode.InvalidRequest,
+      "Invalid JWT format or missing sub claim"
+    );
+  }
+}
+
+// Helper function to decode client ID and extract project and app IDs
+function decodeClientId(clientId: string): {
+  projectId: string;
+  appId: string;
+} {
+  try {
+    // Decode base64
+    const decoded = Buffer.from(clientId, "base64").toString("utf-8");
+
+    // Split by colon
+    const [projectId, appId] = decoded.split(":");
+
+    if (!projectId || !appId) {
+      throw new Error("Invalid client ID format");
+    }
+
+    return { projectId, appId };
+  } catch (error) {
+    console.error("Error decoding client ID:", error);
+    throw new McpError(ErrorCode.InvalidRequest, "Invalid client ID format");
+  }
+}
 export const createServer = () => {
   // Create server instance
   const server = new McpServer({
@@ -81,7 +139,7 @@ export const createServer = () => {
 
   // Register weather tools
   server.tool(
-    "get-alerts1",
+    "get-alerts",
     "Get weather alerts for a state",
     {
       state: z
@@ -89,18 +147,36 @@ export const createServer = () => {
         .length(2)
         .describe("Two-letter state code (e.g. CA, NY)"),
     },
-    async ({ state }, extra) => {
+    async ({ state }, { authInfo }) => {
       console.log(
         "Received get-alerts request with state:",
         state,
         "authInfo:",
-        extra.authInfo
+        authInfo
       );
-      if (!extra.authInfo?.scopes.includes("app:read")) {
+      if (!authInfo?.scopes.includes("app:read")) {
         console.log("You are not authorized");
         throw new McpError(
           ErrorCode.InvalidRequest,
           "Insufficient permissions: 'app:read' scope required"
+        );
+      }
+
+      console.log("Going to fetch outbound token");
+      const descope = createSdk({ projectId: process.env.DESCOPE_PROJECT_ID! });
+      const { appId } = decodeClientId(authInfo.clientId);
+      const userId = getSubFromJwt(authInfo.token);
+      console.log("Going to fetch token with: ", { appId, userId });
+      const res = await descope.management.outboundApplication.fetchToken(
+        appId,
+        userId
+      );
+      console.log("Fetched outbound token successfully, res:", res);
+      if (!res.ok) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          "Failed to fetch outbound token",
+          res
         );
       }
       const stateCode = state.toUpperCase();
