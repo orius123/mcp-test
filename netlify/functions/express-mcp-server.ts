@@ -5,7 +5,7 @@ import path from "path";
 import serverless from "serverless-http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { descopeMcpBearerAuth } from "@descope/mcp-express";
+import { descopeMcpBearerAuth, DescopeMcpProvider } from "@descope/mcp-express";
 import { createServer } from "./create-server.js";
 
 // Type declarations
@@ -35,8 +35,14 @@ app.use(
 );
 app.options("*", cors());
 
+const provider = new DescopeMcpProvider({
+  verifyTokenOptions: {
+    requiredScopes: ["app:read", "app:manage"],
+  },
+});
+
 // Auth middleware for session validation
-app.use(["/mcp"], descopeMcpBearerAuth());
+app.use(["/mcp"], descopeMcpBearerAuth(provider));
 
 // Initialize transport
 const transport = new StreamableHTTPServerTransport({
