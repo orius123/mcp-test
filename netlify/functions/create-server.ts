@@ -163,7 +163,10 @@ export const createServer = () => {
       }
 
       console.log("Going to fetch outbound token");
-      const descope = createSdk({ projectId: process.env.DESCOPE_PROJECT_ID! });
+      const descope = createSdk({
+        projectId: process.env.DESCOPE_PROJECT_ID!,
+        baseUrl: process.env.DESCOPE_BASE_URL,
+      });
       const { appId } = decodeClientId(authInfo.clientId);
       const userId = getSubFromJwt(authInfo.token);
       console.log("Going to fetch token with: ", { appId, userId });
