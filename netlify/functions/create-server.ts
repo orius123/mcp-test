@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 const NWS_API_BASE = "https://api.weather.gov";
@@ -92,9 +93,16 @@ export const createServer = () => {
       console.log(
         "Received get-alerts request with state:",
         state,
-        "extra:",
-        extra
+        "authInfo:",
+        extra.authInfo
       );
+      if (!extra.authInfo?.scopes.includes("app:read")) {
+        console.log("You are not authorized");
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          "Insufficient permissions: 'app:read' scope required"
+        );
+      }
       const stateCode = state.toUpperCase();
       const alertsUrl = `${NWS_API_BASE}/alerts?area=${stateCode}`;
       const alertsData = await makeNWSRequest<AlertsResponse>(alertsUrl);
