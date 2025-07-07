@@ -163,26 +163,10 @@ export const createServer = () => {
       }
 
       console.log("Going to fetch outbound token");
-      const descope = createSdk({
-        projectId: process.env.DESCOPE_PROJECT_ID!,
-        baseUrl: process.env.DESCOPE_BASE_URL,
-      });
-      const { appId } = decodeClientId(authInfo.clientId);
+
       const userId = getSubFromJwt(authInfo.token);
       console.log("Going to fetch token with: ", { appId: "github", userId });
-      // const res = await descope.management.outboundApplication.fetchToken(
-      //   "github",
-      //   userId
-      // );
-      // console.log("Fetched outbound token successfully, res:", res);
-      // if (!res.ok) {
-      //   throw new McpError(
-      //     ErrorCode.InternalError,
-      //     "Failed to fetch outbound token",
-      //     res
-      //   );
-      // }
-      // Make direct POST request instead of using SDK
+
       const response = await fetch(
         "https://asaf.descope.team/v1/mgmt/outbound/app/user/token/latest",
         {
@@ -207,18 +191,6 @@ export const createServer = () => {
 
       // Make GitHub API request
       const githubUrl = `https://api.github.com/users/${username}/repos`;
-      // const githubResponse = await fetch(githubUrl, {
-      //   headers: {
-      //     Authorization: `Bearer ${tokenData.accessToken}`,
-      //     "User-Agent": "weather-app/1.0.0",
-      //   },
-      // });
-      // if (!githubResponse.ok) {
-      //   throw new McpError(
-      //     ErrorCode.InternalError,
-      //     `Failed to fetch GitHub repositories: ${githubResponse.status} ${githubResponse.statusText}`
-      //   );
-      // }
 
       const myHeaders = new Headers();
       myHeaders.append(
@@ -287,6 +259,35 @@ export const createServer = () => {
   );
 
   server.tool(
+    "echo",
+    "Echo back the input",
+    {
+      input: z
+        .string()
+        .min(1, "Input must not be empty")
+        .describe("Input string to echo back"),
+    },
+    async ({ input }, { authInfo }) => {
+      if (!authInfo?.scopes.includes("app:custom")) {
+        console.log("You are not authorized");
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          "Insufficient permissions: 'app:custom' scope required"
+        );
+      }
+      console.log("Received echo request with input:", input);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `You said: ${input}`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
     "get-forecast",
     "Get weather forecast for a location",
     {
@@ -294,12 +295,12 @@ export const createServer = () => {
         .number()
         .min(-90)
         .max(90)
-        .describe("Latitude of the location"),
+        .describe("Latitude of the location, i.e. 37.7749"),
       longitude: z
         .number()
         .min(-180)
         .max(180)
-        .describe("Longitude of the location"),
+        .describe("Longitude of the location, i.e. -122.4194"),
     },
     async ({ latitude, longitude }) => {
       // Get grid point data
