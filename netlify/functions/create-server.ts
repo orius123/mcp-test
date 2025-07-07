@@ -221,7 +221,10 @@ export const createServer = () => {
       // }
 
       const myHeaders = new Headers();
-      myHeaders.append("Authorization", "Bearer " + tokenData.accessToken);
+      myHeaders.append(
+        "Authorization",
+        "Bearer " + tokenData.token.accessToken
+      );
 
       const requestOptions = {
         method: "GET",
