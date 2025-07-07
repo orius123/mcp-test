@@ -35,14 +35,14 @@ app.use(
 );
 app.options("*", cors());
 
-const provider = new DescopeMcpProvider({
-  verifyTokenOptions: {
-    requiredScopes: ["app:read", "app:manage"],
-  },
-});
+// const provider = new DescopeMcpProvider({
+//   verifyTokenOptions: {
+//     requiredScopes: ["app:read", "app:manage"],
+//   },
+// });
 
 // Auth middleware for session validation
-app.use(["/mcp"], descopeMcpBearerAuth(provider));
+app.use(["/mcp"], descopeMcpBearerAuth());
 
 // Initialize transport
 const transport = new StreamableHTTPServerTransport({
