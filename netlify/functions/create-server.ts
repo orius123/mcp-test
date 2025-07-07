@@ -80,7 +80,7 @@ export const createServer = () => {
 
   // Register weather tools
   server.tool(
-    "get-alerts",
+    "get-alerts1",
     "Get weather alerts for a state",
     {
       state: z
