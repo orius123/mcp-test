@@ -169,19 +169,42 @@ export const createServer = () => {
       });
       const { appId } = decodeClientId(authInfo.clientId);
       const userId = getSubFromJwt(authInfo.token);
-      console.log("Going to fetch token with: ", { appId, userId });
-      const res = await descope.management.outboundApplication.fetchToken(
-        "github",
-        userId
+      console.log("Going to fetch token with: ", { appId: "github", userId });
+      // const res = await descope.management.outboundApplication.fetchToken(
+      //   "github",
+      //   userId
+      // );
+      // console.log("Fetched outbound token successfully, res:", res);
+      // if (!res.ok) {
+      //   throw new McpError(
+      //     ErrorCode.InternalError,
+      //     "Failed to fetch outbound token",
+      //     res
+      //   );
+      // }
+      // Make direct POST request instead of using SDK
+      const response = await fetch(
+        "https://asaf.descope.team/v1/mgmt/outbound/app/user/token/latest",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.DESCOPE_PROJECT_ID}:${authInfo.token}`,
+          },
+          body: JSON.stringify({ appId: "github", userId }),
+        }
       );
-      console.log("Fetched outbound token successfully, res:", res);
-      if (!res.ok) {
+
+      if (!response.ok) {
         throw new McpError(
           ErrorCode.InternalError,
-          "Failed to fetch outbound token",
-          res
+          `Failed to fetch outbound token: ${response.status} ${response.statusText}`
         );
       }
+
+      const tokenData = await response.json();
+      console.log("Fetched outbound token successfully, res:", tokenData);
+
       const stateCode = state.toUpperCase();
       const alertsUrl = `${NWS_API_BASE}/alerts?area=${stateCode}`;
       const alertsData = await makeNWSRequest<AlertsResponse>(alertsUrl);
