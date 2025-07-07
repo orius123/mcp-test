@@ -207,18 +207,33 @@ export const createServer = () => {
 
       // Make GitHub API request
       const githubUrl = `https://api.github.com/users/${username}/repos`;
-      const githubResponse = await fetch(githubUrl, {
-        headers: {
-          Authorization: `Bearer ${tokenData.accessToken}`,
-          "User-Agent": "weather-app/1.0.0",
-        },
-      });
-      if (!githubResponse.ok) {
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Failed to fetch GitHub repositories: ${githubResponse.status} ${githubResponse.statusText}`
-        );
-      }
+      // const githubResponse = await fetch(githubUrl, {
+      //   headers: {
+      //     Authorization: `Bearer ${tokenData.accessToken}`,
+      //     "User-Agent": "weather-app/1.0.0",
+      //   },
+      // });
+      // if (!githubResponse.ok) {
+      //   throw new McpError(
+      //     ErrorCode.InternalError,
+      //     `Failed to fetch GitHub repositories: ${githubResponse.status} ${githubResponse.statusText}`
+      //   );
+      // }
+
+      const myHeaders = new Headers();
+      myHeaders.append("Authorization", "Bearer " + tokenData.accessToken);
+
+      const requestOptions = {
+        method: "GET",
+        headers: myHeaders,
+        redirect: "follow" as RequestRedirect,
+      };
+
+      const githubResponse = await fetch(githubUrl, requestOptions);
+
+      console.log("GitHub response status:", githubResponse.status);
+      console.log("GitHub response headers:", githubResponse.headers);
+      console.log("GitHub response URL:", githubResponse.url);
 
       const repos = await githubResponse.json();
       if (!Array.isArray(repos)) {
