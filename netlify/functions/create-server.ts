@@ -139,18 +139,18 @@ export const createServer = () => {
 
   // Register weather tools
   server.tool(
-    "get-alerts",
-    "Get weather alerts for a state",
+    "read-repos",
+    "Read GitHub repositories",
     {
-      state: z
+      username: z
         .string()
-        .length(2)
-        .describe("Two-letter state code (e.g. CA, NY)"),
+        .min(1, "Username must not be empty")
+        .describe("GitHub username to read repositories for"),
     },
-    async ({ state }, { authInfo }) => {
+    async ({ username }, { authInfo }) => {
       console.log(
-        "Received get-alerts request with state:",
-        state,
+        "Received read-repos request with username:",
+        username,
         "authInfo:",
         authInfo
       );
@@ -205,43 +205,59 @@ export const createServer = () => {
       const tokenData = await response.json();
       console.log("Fetched outbound token successfully, res:", tokenData);
 
-      const stateCode = state.toUpperCase();
-      const alertsUrl = `${NWS_API_BASE}/alerts?area=${stateCode}`;
-      const alertsData = await makeNWSRequest<AlertsResponse>(alertsUrl);
+      // Make GitHub API request
+      const githubUrl = `https://api.github.com/users/${username}/repos`;
+      const githubResponse = await fetch(githubUrl, {
+        headers: {
+          Authorization: `Bearer ${tokenData.accessToken}`,
+          "User-Agent": "weather-app/1.0.0",
+        },
+      });
+      if (!githubResponse.ok) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to fetch GitHub repositories: ${githubResponse.status} ${githubResponse.statusText}`
+        );
+      }
 
-      if (!alertsData) {
+      const repos = await githubResponse.json();
+      if (!Array.isArray(repos)) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          "Unexpected response format from GitHub API"
+        );
+      }
+      if (repos.length === 0) {
         return {
           content: [
             {
               type: "text",
-              text: "Failed to retrieve alerts data",
+              text: `No repositories found for user ${username}.`,
             },
           ],
         };
       }
 
-      const features = alertsData.features || [];
-      if (features.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `No active alerts for ${stateCode}`,
-            },
-          ],
-        };
-      }
+      // Format repository data
+      const formattedRepos = repos.map((repo: any) => {
+        return [
+          `Name: ${repo.name}`,
+          `Description: ${repo.description || "No description"}`,
+          `URL: ${repo.html_url}`,
+          `Stars: ${repo.stargazers_count}`,
+          `Forks: ${repo.forks_count}`,
+        ];
+      });
 
-      const formattedAlerts = features.map(formatAlert);
-      const alertsText = `Active alerts for ${stateCode}:\n\n${formattedAlerts.join(
-        "\n"
-      )}`;
+      const reposText = formattedRepos
+        .map((repo: string[]) => repo.join("\n"))
+        .join("\n\n");
 
       return {
         content: [
           {
             type: "text",
-            text: alertsText,
+            text: reposText || `No repositories found for user ${username}.`,
           },
         ],
       };
