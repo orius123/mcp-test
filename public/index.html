@@ -254,24 +254,48 @@
               body: JSON.stringify(config)
             });
             
-            const result = await response.json();
+            // Better error handling for non-JSON responses
+            let result;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              result = await response.json();
+            } else {
+              // If response is not JSON, create a generic error object
+              const text = await response.text();
+              result = { 
+                error: `Server returned non-JSON response: ${response.status} ${response.statusText}`,
+                details: text || 'No additional details'
+              };
+            }
             
-            if (response.ok) {
+            if (response.ok && result.success) {
+              const storageInfo = result.storage === 'netlify-blobs' 
+                ? '✅ Persistent storage (Netlify Blobs)' 
+                : '⚠️ Temporary storage (session only)';
+              
               showStatus(
                 result.message || 'Configuration updated successfully!', 
                 'success',
-                `Stored in: ${result.storage || 'Netlify Blobs'}`
+                storageInfo
               );
             } else {
-              throw new Error(result.error || 'Unknown error');
+              throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
             }
           } catch (error) {
             console.error('Server config update failed:', error);
-            showStatus(
-              'Failed to update server configuration', 
-              'error',
-              error.message || 'Check console for details'
-            );
+            
+            let errorMessage = 'Failed to update server configuration';
+            let errorDetails = 'Check browser console for details';
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+              errorMessage = 'Network error - server unavailable';
+              errorDetails = 'Check if server is running or refresh the page';
+            } else if (error.message.includes('JSON')) {
+              errorMessage = 'Server configuration error';
+              errorDetails = 'Server may be misconfigured or Netlify Blobs unavailable';
+            }
+            
+            showStatus(errorMessage, 'error', errorDetails);
           }
         }
 

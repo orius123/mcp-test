@@ -156,14 +156,14 @@ app.post("/api/config", async (req: Request, res: Response) => {
       baseUrl: baseUrl.trim() || DEFAULT_DESCOPE_BASE_URL
     };
     
-    // Save to Netlify Blobs
-    await saveConfig(config);
+    // Save configuration with fallback handling
+    const saveResult = await saveConfig(config);
     
     res.json({ 
-      success: true, 
+      success: saveResult.success, 
       config: config,
-      message: "Configuration saved successfully",
-      storage: "netlify-blobs"
+      message: `Configuration saved successfully to ${saveResult.storage}`,
+      storage: saveResult.storage
     });
   } catch (error) {
     console.error('Error updating configuration:', error);
@@ -177,9 +177,10 @@ app.post("/api/config", async (req: Request, res: Response) => {
 app.get("/api/config", async (_req: Request, res: Response) => {
   try {
     const config = await loadConfig();
+    
     res.json({
       ...config,
-      storage: "netlify-blobs",
+      storage: "auto-fallback",
       hasEnvFallback: {
         projectId: !!process.env.DESCOPE_PROJECT_ID,
         baseUrl: !!process.env.DESCOPE_BASE_URL
