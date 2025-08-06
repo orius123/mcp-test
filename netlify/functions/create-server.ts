@@ -168,7 +168,7 @@ export const createServer = () => {
       console.log("Going to fetch token with: ", { appId: "github", userId });
 
       const response = await fetch(
-        "https://asaf.descope.team/v1/mgmt/outbound/app/user/token/latest",
+        "https://api.descope.com/v1/mgmt/outbound/app/user/token/latest",
         {
           method: "POST",
           headers: {
@@ -323,7 +323,7 @@ export const createServer = () => {
       console.log("Going to fetch token with: ", { appId: "github", userId });
 
       const response = await fetch(
-        "https://asaf.descope.team/v1/mgmt/outbound/app/user/token/latest",
+        "https://api.descope.com/v1/mgmt/outbound/app/user/token/latest",
         {
           method: "POST",
           headers: {
