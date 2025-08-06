@@ -126,6 +126,121 @@
           2
         );
 
+        // Descope Configuration Management
+        const STORAGE_KEY = 'descope_config';
+        const projectIdInput = document.getElementById('project-id');
+        const baseUrlInput = document.getElementById('base-url');
+        const saveButton = document.getElementById('save-config');
+        const clearButton = document.getElementById('clear-config');
+        const statusDiv = document.getElementById('config-status');
+
+        // Load saved configuration on page load
+        async function loadConfig() {
+          try {
+            // First try to load from localStorage
+            const savedConfig = localStorage.getItem(STORAGE_KEY);
+            if (savedConfig) {
+              const config = JSON.parse(savedConfig);
+              projectIdInput.value = config.projectId || '';
+              baseUrlInput.value = config.baseUrl || 'https://api.descope.com';
+            }
+            
+            // Also try to load from server
+            try {
+              const response = await fetch('/api/config');
+              if (response.ok) {
+                const serverConfig = await response.json();
+                // If server has configuration and local storage is empty, use server config
+                if (serverConfig.projectId && !savedConfig) {
+                  projectIdInput.value = serverConfig.projectId;
+                  baseUrlInput.value = serverConfig.baseUrl || 'https://api.descope.com';
+                }
+              }
+            } catch (serverError) {
+              console.log('Server config not available:', serverError);
+            }
+          } catch (error) {
+            console.error('Error loading configuration:', error);
+          }
+        }
+
+        // Save configuration to localStorage
+        function saveConfig() {
+          try {
+            const config = {
+              projectId: projectIdInput.value.trim(),
+              baseUrl: baseUrlInput.value.trim() || 'https://api.descope.com',
+              timestamp: Date.now()
+            };
+            
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+            showStatus('Configuration saved successfully!', 'success');
+            
+            // Also update server configuration via API
+            updateServerConfig(config);
+          } catch (error) {
+            console.error('Error saving configuration:', error);
+            showStatus('Error saving configuration', 'error');
+          }
+        }
+
+        // Clear configuration
+        function clearConfig() {
+          localStorage.removeItem(STORAGE_KEY);
+          projectIdInput.value = '';
+          baseUrlInput.value = 'https://api.descope.com';
+          showStatus('Configuration cleared', 'info');
+          
+          // Also clear server configuration
+          updateServerConfig({ projectId: '', baseUrl: 'https://api.descope.com' });
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+          statusDiv.textContent = message;
+          statusDiv.className = `p-3 rounded-md mb-4 ${
+            type === 'success' ? 'bg-green-600 text-white' :
+            type === 'error' ? 'bg-red-600 text-white' :
+            'bg-blue-600 text-white'
+          }`;
+          statusDiv.classList.remove('hidden');
+          
+          setTimeout(() => {
+            statusDiv.classList.add('hidden');
+          }, 3000);
+        }
+
+        // Update server configuration via API
+        function updateServerConfig(config) {
+          fetch('/api/config', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(config)
+          }).catch(error => {
+            console.log('Server config update not available:', error);
+            // This is expected if the endpoint doesn't exist yet
+          });
+        }
+
+        // Event listeners
+        saveButton.addEventListener('click', saveConfig);
+        clearButton.addEventListener('click', clearConfig);
+
+        // Auto-save on input change (debounced)
+        let saveTimeout;
+        function debouncedSave() {
+          clearTimeout(saveTimeout);
+          saveTimeout = setTimeout(saveConfig, 1000);
+        }
+        
+        projectIdInput.addEventListener('input', debouncedSave);
+        baseUrlInput.addEventListener('input', debouncedSave);
+
+        // Load configuration on page load
+        loadConfig();
+
         // Copy button functionality
         const preBlocks = document.querySelectorAll("pre");
         preBlocks.forEach((pre) => {
@@ -178,6 +293,53 @@
         </p>
 
         <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
+          Configuration
+        </h2>
+        <div class="card rounded-lg p-6 mb-6">
+          <h3 class="text-xl font-semibold text-white mb-3">Descope Settings</h3>
+          <p class="text-gray-300 mb-4">Configure your Descope authentication settings below. These settings are saved locally in your browser.</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label for="project-id" class="block text-sm font-medium text-gray-300 mb-2">Project ID</label>
+              <input 
+                type="text" 
+                id="project-id" 
+                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Enter your Descope Project ID"
+              />
+            </div>
+            <div>
+              <label for="base-url" class="block text-sm font-medium text-gray-300 mb-2">Base URL</label>
+              <input 
+                type="text" 
+                id="base-url" 
+                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="https://api.descope.com"
+                value="https://api.descope.com"
+              />
+            </div>
+          </div>
+          
+          <div class="flex gap-3 mb-4">
+            <button 
+              id="save-config" 
+              class="px-4 py-2 bg-primary text-white rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-colors"
+            >
+              Save Configuration
+            </button>
+            <button 
+              id="clear-config" 
+              class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          
+          <div id="config-status" class="hidden p-3 rounded-md mb-4"></div>
+        </div>
+
+        <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
           Quick Start
         </h2>
         <div class="card rounded-lg p-6 mb-6">
@@ -186,7 +348,7 @@
         </div>
 
         <div class="card rounded-lg p-6 mb-6">
-          <h3 class="text-xl font-semibold text-white mb-3">Configuration</h3>
+          <h3 class="text-xl font-semibold text-white mb-3">MCP Configuration</h3>
           <pre><code id="config-json"></code></pre>
         </div>
 
