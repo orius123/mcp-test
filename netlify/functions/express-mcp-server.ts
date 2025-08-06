@@ -7,7 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { descopeMcpBearerAuth, DescopeMcpProvider } from "@descope/mcp-express";
 import { createServer } from "./create-server.js";
-import { getStore } from "@netlify/blobs";
+import { loadConfig, saveConfig, DescopeConfig, DEFAULT_DESCOPE_BASE_URL } from "./config.js";
 
 // Type declarations
 declare global {
@@ -24,55 +24,7 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
-// Blob storage for configuration
-const configStore = getStore('descope-config');
-const CONFIG_KEY = 'settings';
-
-// Configuration interface
-interface DescopeConfig {
-  projectId: string;
-  baseUrl: string;
-}
-
-// Load configuration from Netlify Blobs with fallbacks
-async function loadConfig(): Promise<DescopeConfig> {
-  try {
-    // Try to load from Netlify Blobs first
-    const blobData = await configStore.get(CONFIG_KEY, { type: 'text' });
-    if (blobData) {
-      const blobConfig = JSON.parse(blobData);
-      console.log('Loaded config from blobs:', blobConfig);
-      return {
-        projectId: blobConfig.projectId || process.env.DESCOPE_PROJECT_ID || '',
-        baseUrl: blobConfig.baseUrl || process.env.DESCOPE_BASE_URL || 'https://api.descope.com'
-      };
-    }
-  } catch (error) {
-    console.warn('Failed to load config from blobs:', error);
-  }
-
-  // Fallback to environment variables
-  console.log('Using environment variable config');
-  return {
-    projectId: process.env.DESCOPE_PROJECT_ID || '',
-    baseUrl: process.env.DESCOPE_BASE_URL || 'https://api.descope.com'
-  };
-}
-
-// Save configuration to Netlify Blobs
-async function saveConfig(config: DescopeConfig): Promise<void> {
-  try {
-    await configStore.set(CONFIG_KEY, JSON.stringify(config), { 
-      metadata: { 
-        updatedAt: new Date().toISOString() 
-      }
-    });
-    console.log('Saved config to blobs:', config);
-  } catch (error) {
-    console.error('Failed to save config to blobs:', error);
-    throw error;
-  }
-}
+// Configuration is now handled by the shared config module
 
 // Middleware setup
 app.use(express.json());
@@ -201,7 +153,7 @@ app.post("/api/config", async (req: Request, res: Response) => {
     // Create configuration object
     const config: DescopeConfig = {
       projectId: projectId.trim(),
-      baseUrl: baseUrl.trim() || 'https://api.descope.com'
+      baseUrl: baseUrl.trim() || DEFAULT_DESCOPE_BASE_URL
     };
     
     // Save to Netlify Blobs

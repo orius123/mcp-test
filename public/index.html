@@ -128,6 +128,7 @@
 
         // Descope Configuration Management
         const STORAGE_KEY = 'descope_config';
+        const DEFAULT_BASE_URL = 'https://api.descope.com';
         const projectIdInput = document.getElementById('project-id');
         const baseUrlInput = document.getElementById('base-url');
         const saveButton = document.getElementById('save-config');
@@ -142,7 +143,7 @@
             if (savedConfig) {
               const config = JSON.parse(savedConfig);
               projectIdInput.value = config.projectId || '';
-              baseUrlInput.value = config.baseUrl || 'https://api.descope.com';
+              baseUrlInput.value = config.baseUrl || DEFAULT_BASE_URL;
             }
             
             // Also try to load from server
@@ -153,7 +154,7 @@
                 // If server has configuration and local storage is empty, use server config
                 if (serverConfig.projectId && !savedConfig) {
                   projectIdInput.value = serverConfig.projectId;
-                  baseUrlInput.value = serverConfig.baseUrl || 'https://api.descope.com';
+                  baseUrlInput.value = serverConfig.baseUrl || DEFAULT_BASE_URL;
                 }
                 
                 // Show server configuration status
@@ -164,7 +165,7 @@
                   .map(([key, _]) => key)
                   .join(', ');
                 
-                if (serverConfig.projectId || serverConfig.baseUrl !== 'https://api.descope.com') {
+                if (serverConfig.projectId || serverConfig.baseUrl !== DEFAULT_BASE_URL) {
                   showStatus(
                     'Server configuration loaded',
                     'info',
@@ -190,7 +191,7 @@
           try {
             const config = {
               projectId: projectIdInput.value.trim(),
-              baseUrl: baseUrlInput.value.trim() || 'https://api.descope.com',
+              baseUrl: baseUrlInput.value.trim() || DEFAULT_BASE_URL,
               timestamp: Date.now()
             };
             
@@ -208,11 +209,11 @@
         function clearConfig() {
           localStorage.removeItem(STORAGE_KEY);
           projectIdInput.value = '';
-          baseUrlInput.value = 'https://api.descope.com';
+          baseUrlInput.value = DEFAULT_BASE_URL;
           showStatus('Configuration cleared', 'info');
           
           // Also clear server configuration
-          updateServerConfig({ projectId: '', baseUrl: 'https://api.descope.com' });
+          updateServerConfig({ projectId: '', baseUrl: DEFAULT_BASE_URL });
         }
 
         // Show status message
@@ -288,6 +289,10 @@
         
         projectIdInput.addEventListener('input', debouncedSave);
         baseUrlInput.addEventListener('input', debouncedSave);
+
+        // Set placeholder and default value dynamically
+        baseUrlInput.placeholder = DEFAULT_BASE_URL;
+        baseUrlInput.value = DEFAULT_BASE_URL;
 
         // Load configuration on page load
         loadConfig();
@@ -366,8 +371,7 @@
                 type="text" 
                 id="base-url" 
                 class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="https://api.descope.com"
-                value="https://api.descope.com"
+                placeholder=""
               />
             </div>
           </div>
