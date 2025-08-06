@@ -7,7 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { descopeMcpBearerAuth, DescopeMcpProvider } from "@descope/mcp-express";
 import { createServer } from "./create-server.js";
-import { loadConfig, saveConfig, DescopeConfig, DEFAULT_DESCOPE_BASE_URL } from "./config.js";
+import { loadConfig, saveConfig, testBlobs, DescopeConfig, DEFAULT_DESCOPE_BASE_URL } from "./config.js";
 
 // Type declarations
 declare global {
@@ -156,14 +156,14 @@ app.post("/api/config", async (req: Request, res: Response) => {
       baseUrl: baseUrl.trim() || DEFAULT_DESCOPE_BASE_URL
     };
     
-    // Save configuration with fallback handling
-    const saveResult = await saveConfig(config);
+    // Save configuration to Netlify Blobs
+    await saveConfig(config);
     
     res.json({ 
-      success: saveResult.success, 
+      success: true, 
       config: config,
-      message: `Configuration saved successfully to ${saveResult.storage}`,
-      storage: saveResult.storage
+      message: "Configuration saved to Netlify Blobs",
+      storage: "netlify-blobs"
     });
   } catch (error) {
     console.error('Error updating configuration:', error);
@@ -180,7 +180,7 @@ app.get("/api/config", async (_req: Request, res: Response) => {
     
     res.json({
       ...config,
-      storage: "auto-fallback",
+      storage: "netlify-blobs",
       hasEnvFallback: {
         projectId: !!process.env.DESCOPE_PROJECT_ID,
         baseUrl: !!process.env.DESCOPE_BASE_URL
@@ -191,6 +191,38 @@ app.get("/api/config", async (_req: Request, res: Response) => {
     res.status(500).json({ 
       error: "Failed to load configuration",
       details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Netlify Blobs test endpoint
+app.get("/api/test-blobs", async (_req: Request, res: Response) => {
+  try {
+    const testResult = await testBlobs();
+    
+    if (testResult.success) {
+      res.json({
+        status: "✅ SUCCESS",
+        message: "Netlify Blobs is working correctly",
+        details: testResult.details,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        status: "❌ FAILED",
+        message: "Netlify Blobs test failed",
+        details: testResult.details,
+        error: testResult.error,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Blobs test endpoint error:', error);
+    res.status(500).json({
+      status: "❌ ERROR",
+      message: "Test endpoint failed",
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
     });
   }
 });

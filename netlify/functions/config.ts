@@ -10,80 +10,91 @@ export interface DescopeConfig {
   baseUrl: string;
 }
 
-// In-memory fallback storage
-let inMemoryConfig: DescopeConfig | null = null;
-
-// Check if Netlify Blobs is available
-let blobsAvailable = true;
-let configStore: any = null;
-
-try {
-  configStore = getStore('descope-config');
-} catch (error) {
-  console.warn('Netlify Blobs not available, falling back to in-memory storage:', error);
-  blobsAvailable = false;
-}
-
+// Netlify Blobs configuration
+const STORE_NAME = 'descope-config';
 const CONFIG_KEY = 'settings';
 
-// Load configuration with multiple fallbacks
+// Load configuration from Netlify Blobs ONLY
 export async function loadConfig(): Promise<DescopeConfig> {
-  // Try Netlify Blobs first if available
-  if (blobsAvailable && configStore) {
-    try {
-      const blobData = await configStore.get(CONFIG_KEY, { type: 'text' });
-      if (blobData) {
-        const blobConfig = JSON.parse(blobData);
-        console.log('Loaded config from Netlify Blobs:', blobConfig);
-        return {
-          projectId: blobConfig.projectId || process.env.DESCOPE_PROJECT_ID || DEFAULT_PROJECT_ID,
-          baseUrl: blobConfig.baseUrl || process.env.DESCOPE_BASE_URL || DEFAULT_DESCOPE_BASE_URL
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to load config from Netlify Blobs:', error);
-      blobsAvailable = false; // Disable blobs for future requests
+  try {
+    const store = getStore(STORE_NAME);
+    const configData = await store.get(CONFIG_KEY, { type: 'text' });
+    
+    if (configData) {
+      const config = JSON.parse(configData);
+      console.log('✅ Loaded config from Netlify Blobs:', config);
+      return {
+        projectId: config.projectId || process.env.DESCOPE_PROJECT_ID || DEFAULT_PROJECT_ID,
+        baseUrl: config.baseUrl || process.env.DESCOPE_BASE_URL || DEFAULT_DESCOPE_BASE_URL
+      };
     }
-  }
-
-  // Try in-memory storage
-  if (inMemoryConfig) {
-    console.log('Loaded config from in-memory storage:', inMemoryConfig);
+    
+    console.log('⚠️  No config found in Netlify Blobs, using environment variables');
     return {
-      projectId: inMemoryConfig.projectId || process.env.DESCOPE_PROJECT_ID || DEFAULT_PROJECT_ID,
-      baseUrl: inMemoryConfig.baseUrl || process.env.DESCOPE_BASE_URL || DEFAULT_DESCOPE_BASE_URL
+      projectId: process.env.DESCOPE_PROJECT_ID || DEFAULT_PROJECT_ID,
+      baseUrl: process.env.DESCOPE_BASE_URL || DEFAULT_DESCOPE_BASE_URL
+    };
+  } catch (error) {
+    console.error('❌ Failed to load config from Netlify Blobs:', error);
+    console.log('🔄 Falling back to environment variables');
+    return {
+      projectId: process.env.DESCOPE_PROJECT_ID || DEFAULT_PROJECT_ID,
+      baseUrl: process.env.DESCOPE_BASE_URL || DEFAULT_DESCOPE_BASE_URL
     };
   }
-
-  // Final fallback to environment variables
-  console.log('Using environment variable config only');
-  return {
-    projectId: process.env.DESCOPE_PROJECT_ID || DEFAULT_PROJECT_ID,
-    baseUrl: process.env.DESCOPE_BASE_URL || DEFAULT_DESCOPE_BASE_URL
-  };
 }
 
-// Save configuration with fallback handling
-export async function saveConfig(config: DescopeConfig): Promise<{ storage: string; success: boolean }> {
-  // Try Netlify Blobs first if available
-  if (blobsAvailable && configStore) {
-    try {
-      await configStore.set(CONFIG_KEY, JSON.stringify(config), { 
-        metadata: { 
-          updatedAt: new Date().toISOString() 
-        }
-      });
-      console.log('Saved config to Netlify Blobs:', config);
-      inMemoryConfig = config; // Also store in memory as backup
-      return { storage: 'netlify-blobs', success: true };
-    } catch (error) {
-      console.warn('Failed to save config to Netlify Blobs, falling back to in-memory:', error);
-      blobsAvailable = false; // Disable blobs for future requests
-    }
+// Save configuration to Netlify Blobs ONLY
+export async function saveConfig(config: DescopeConfig): Promise<void> {
+  try {
+    const store = getStore(STORE_NAME);
+    await store.set(CONFIG_KEY, JSON.stringify(config), {
+      metadata: {
+        updatedAt: new Date().toISOString(),
+        version: '1.0'
+      }
+    });
+    console.log('✅ Saved config to Netlify Blobs:', config);
+  } catch (error) {
+    console.error('❌ Failed to save config to Netlify Blobs:', error);
+    throw new Error(`Netlify Blobs save failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
 
-  // Fallback to in-memory storage
-  inMemoryConfig = config;
-  console.log('Saved config to in-memory storage:', config);
-  return { storage: 'in-memory', success: true };
+// Test Netlify Blobs functionality
+export async function testBlobs(): Promise<{ success: boolean; details: string; error?: string }> {
+  try {
+    const store = getStore(STORE_NAME);
+    const testKey = 'test-' + Date.now();
+    const testData = { test: true, timestamp: new Date().toISOString() };
+    
+    // Test write
+    await store.set(testKey, JSON.stringify(testData));
+    
+    // Test read
+    const retrieved = await store.get(testKey, { type: 'text' });
+    const parsedData = JSON.parse(retrieved || '{}');
+    
+    // Test delete
+    await store.delete(testKey);
+    
+    if (parsedData.test === true) {
+      return {
+        success: true,
+        details: `Netlify Blobs working correctly. Store: ${STORE_NAME}, Test key: ${testKey}`
+      };
+    } else {
+      return {
+        success: false,
+        details: 'Data corruption during read/write test',
+        error: `Expected test data, got: ${JSON.stringify(parsedData)}`
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      details: 'Netlify Blobs test failed',
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 }

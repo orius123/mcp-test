@@ -125,78 +125,62 @@
           }
         });
 
-        // Descope Configuration Management
-        const STORAGE_KEY = 'descope_config';
+        // Descope Configuration Management (Netlify Blobs ONLY)
         const DEFAULT_BASE_URL = 'https://api.descope.com';
         const projectIdInput = document.getElementById('project-id');
         const baseUrlInput = document.getElementById('base-url');
         const saveButton = document.getElementById('save-config');
         const clearButton = document.getElementById('clear-config');
+        const testButton = document.getElementById('test-blobs');
         const statusDiv = document.getElementById('config-status');
 
-        // Load saved configuration on page load
+        // Load configuration from server (Netlify Blobs)
         async function loadConfig() {
           try {
-            // First try to load from localStorage
-            const savedConfig = localStorage.getItem(STORAGE_KEY);
-            if (savedConfig) {
-              const config = JSON.parse(savedConfig);
+            const response = await fetch('/api/config');
+            if (response.ok) {
+              const config = await response.json();
               projectIdInput.value = config.projectId || '';
               baseUrlInput.value = config.baseUrl || DEFAULT_BASE_URL;
-            }
-            
-            // Also try to load from server
-            try {
-              const response = await fetch('/api/config');
-              if (response.ok) {
-                const serverConfig = await response.json();
-                // If server has configuration and local storage is empty, use server config
-                if (serverConfig.projectId && !savedConfig) {
-                  projectIdInput.value = serverConfig.projectId;
-                  baseUrlInput.value = serverConfig.baseUrl || DEFAULT_BASE_URL;
-                }
-                
-                // Show server configuration status
-                const storageInfo = serverConfig.storage || 'Unknown';
-                const hasEnvFallback = serverConfig.hasEnvFallback || {};
-                const envStatus = Object.entries(hasEnvFallback)
-                  .filter(([_, hasEnv]) => hasEnv)
-                  .map(([key, _]) => key)
-                  .join(', ');
-                
-                if (serverConfig.projectId || serverConfig.baseUrl !== DEFAULT_BASE_URL) {
-                  showStatus(
-                    'Server configuration loaded',
-                    'info',
-                    `Storage: ${storageInfo}${envStatus ? ` | Env fallbacks: ${envStatus}` : ''}`
-                  );
-                }
+              
+              const hasEnvFallback = config.hasEnvFallback || {};
+              const envStatus = Object.entries(hasEnvFallback)
+                .filter(([_, hasEnv]) => hasEnv)
+                .map(([key, _]) => key)
+                .join(', ');
+              
+              if (config.projectId || config.baseUrl !== DEFAULT_BASE_URL) {
+                showStatus(
+                  'Configuration loaded from Netlify Blobs',
+                  'success',
+                  `${envStatus ? `Environment fallbacks available: ${envStatus}` : 'No environment fallbacks'}`
+                );
               }
-            } catch (serverError) {
-              console.log('Server config not available:', serverError);
+            } else {
               showStatus(
-                'Server configuration unavailable',
-                'error',
-                'Using local storage only'
+                'Failed to load configuration',
+                'error', 
+                'Check Netlify Blobs availability'
               );
             }
           } catch (error) {
             console.error('Error loading configuration:', error);
+            showStatus(
+              'Network error loading configuration',
+              'error',
+              'Check if server is running'
+            );
           }
         }
 
-        // Save configuration to localStorage
+        // Save configuration to Netlify Blobs
         async function saveConfig() {
           try {
             const config = {
               projectId: projectIdInput.value.trim(),
-              baseUrl: baseUrlInput.value.trim() || DEFAULT_BASE_URL,
-              timestamp: Date.now()
+              baseUrl: baseUrlInput.value.trim() || DEFAULT_BASE_URL
             };
             
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-            
-            // Also update server configuration via API (this will show its own status)
             await updateServerConfig(config);
           } catch (error) {
             console.error('Error saving configuration:', error);
@@ -205,14 +189,17 @@
         }
 
         // Clear configuration
-        function clearConfig() {
-          localStorage.removeItem(STORAGE_KEY);
-          projectIdInput.value = '';
-          baseUrlInput.value = DEFAULT_BASE_URL;
-          showStatus('Configuration cleared', 'info');
-          
-          // Also clear server configuration
-          updateServerConfig({ projectId: '', baseUrl: DEFAULT_BASE_URL });
+        async function clearConfig() {
+          try {
+            projectIdInput.value = '';
+            baseUrlInput.value = DEFAULT_BASE_URL;
+            
+            // Clear server configuration
+            await updateServerConfig({ projectId: '', baseUrl: DEFAULT_BASE_URL });
+          } catch (error) {
+            console.error('Error clearing configuration:', error);
+            showStatus('Error clearing configuration', 'error', error.message);
+          }
         }
 
         // Show status message
@@ -269,14 +256,10 @@
             }
             
             if (response.ok && result.success) {
-              const storageInfo = result.storage === 'netlify-blobs' 
-                ? '✅ Persistent storage (Netlify Blobs)' 
-                : '⚠️ Temporary storage (session only)';
-              
               showStatus(
-                result.message || 'Configuration updated successfully!', 
+                result.message || 'Configuration saved to Netlify Blobs!', 
                 'success',
-                storageInfo
+                '✅ Configuration persisted and active immediately'
               );
             } else {
               throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
@@ -299,9 +282,43 @@
           }
         }
 
+        // Test Netlify Blobs functionality
+        async function testBlobs() {
+          try {
+            showStatus('Testing Netlify Blobs...', 'info', 'Running read/write test');
+            
+            const response = await fetch('/api/test-blobs');
+            const result = await response.json();
+            
+            if (response.ok && result.status.includes('SUCCESS')) {
+              showStatus(
+                result.message,
+                'success',
+                `${result.details} | Time: ${new Date(result.timestamp).toLocaleTimeString()}`
+              );
+            } else {
+              showStatus(
+                result.message || 'Netlify Blobs test failed',
+                'error',
+                `${result.details}${result.error ? ` | Error: ${result.error}` : ''}`
+              );
+            }
+          } catch (error) {
+            console.error('Test blobs failed:', error);
+            showStatus(
+              'Blobs test failed',
+              'error',
+              `Network error: ${error.message}`
+            );
+          }
+        }
+
         // Event listeners
         saveButton.addEventListener('click', saveConfig);
         clearButton.addEventListener('click', clearConfig);
+        if (testButton) {
+          testButton.addEventListener('click', testBlobs);
+        }
 
         // Auto-save on input change (debounced)
         let saveTimeout;
@@ -405,6 +422,12 @@
               class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors"
             >
               Clear
+            </button>
+            <button 
+              id="test-blobs" 
+              class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors"
+            >
+              🧪 Test Blobs
             </button>
           </div>
           
