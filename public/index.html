@@ -112,19 +112,18 @@
         // Set server URL
         document.getElementById("server-url").textContent = SERVER_URL;
 
-        // Set configuration JSON
-        const config = {
-          mcpServers: {
-            weather: {
-              url: SERVER_URL,
-            },
-          },
-        };
-        document.getElementById("config-json").textContent = JSON.stringify(
-          config,
-          null,
-          2
-        );
+        // Populate all URL placeholders
+        const urlElements = [
+          'vscode-url', 'remote-url', 'inspector-url', 
+          'claude-url', 'curl-url'
+        ];
+        
+        urlElements.forEach(elementId => {
+          const element = document.getElementById(elementId);
+          if (element) {
+            element.textContent = SERVER_URL;
+          }
+        });
 
         // Descope Configuration Management
         const STORAGE_KEY = 'descope_config';
@@ -324,36 +323,30 @@
     <main class="container mx-auto px-4 pb-12 flex-grow pt-8">
       <div class="max-w-4xl mx-auto">
         <h1 class="text-4xl font-bold font-heading text-white mb-6">
-          🔧 MCP Server
+          🤖 MCP Test Server
         </h1>
         <p class="text-lg text-gray-300 mb-8">
-          A
-          <a
-            href="https://github.com/modelcontextprotocol/typescript-sdk?tab=readme-ov-file#without-session-management-stateless"
-            >Stateless</a
-          >
-          <a
-            href="https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http"
-            >Streamable HTTP</a
-          >
+          A configurable
           <a href="https://modelcontextprotocol.com/" class="hover:text-primary"
             >Model Context Protocol (MCP)</a
           >
-          server secured by
+          server for testing and development. Features 
           <a href="https://www.descope.com/" class="hover:text-primary"
-            >Descope</a
-          >
-          <a href="https://www.npmjs.com/package/@descope/mcp-express">auth</a>
-          and hosted on
-          <a href="https://netlify.com/" class="hover:text-primary">Netlify</a>.
+            >Descope</a> authentication,
+          <a
+            href="https://github.com/modelcontextprotocol/typescript-sdk?tab=readme-ov-file#without-session-management-stateless"
+            >stateless operation</a>, and
+          <a
+            href="https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http"
+            >streamable HTTP transport</a>.
         </p>
 
         <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
-          Configuration
+          Server Configuration
         </h2>
         <div class="card rounded-lg p-6 mb-6">
-          <h3 class="text-xl font-semibold text-white mb-3">Descope Settings</h3>
-          <p class="text-gray-300 mb-4">Configure your Descope authentication settings below. These settings are saved locally in your browser.</p>
+          <h3 class="text-xl font-semibold text-white mb-3">Descope Authentication</h3>
+          <p class="text-gray-300 mb-4">Configure your Descope settings to enable MCP client authentication. Changes are saved persistently and take effect immediately.</p>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
@@ -395,118 +388,168 @@
         </div>
 
         <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
-          Quick Start
+          Server Information
         </h2>
         <div class="card rounded-lg p-6 mb-6">
-          <h3 class="text-xl font-semibold text-white mb-3">Server URL</h3>
+          <h3 class="text-xl font-semibold text-white mb-3">MCP Server URL</h3>
           <pre><code class="px-2 py-1 rounded" id="server-url"></code></pre>
-        </div>
-
-        <div class="card rounded-lg p-6 mb-6">
-          <h3 class="text-xl font-semibold text-white mb-3">MCP Configuration</h3>
-          <pre><code id="config-json"></code></pre>
+          <p class="text-gray-400 text-sm mt-2">Use this URL to connect MCP clients to this server</p>
         </div>
 
         <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
-          IDE Integration
+          Client Integration
         </h2>
-        <div class="card rounded-lg p-6 mb-6">
-          <h3 class="text-xl font-semibold text-white mb-3">Windsurf</h3>
-          <ol class="list-decimal pl-6 space-y-2 text-gray-300">
-            <li>Open Settings</li>
-            <li>
-              Navigate to
-              <strong class="font-semibold text-white">Cascade</strong> →
-              <strong class="font-semibold text-white"
-                >Model Context Provider Servers</strong
-              >
-            </li>
-            <li>
-              Select
-              <strong class="font-semibold text-white">Add Server</strong>
-            </li>
-          </ol>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <!-- IDE Integrations -->
+          <div class="card rounded-lg p-6">
+            <h3 class="text-xl font-semibold text-white mb-4">🔧 IDE Integration</h3>
+            
+            <div class="mb-4">
+              <h4 class="text-lg font-medium text-white mb-2">VSCode</h4>
+              <p class="text-gray-300 text-sm mb-2">Add to your <code class="bg-gray-700 px-1 rounded">settings.json</code>:</p>
+              <pre class="text-sm"><code>{
+  "mcp.servers": {
+    "test-server": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-http"],
+      "url": "<span id="vscode-url"></span>"
+    }
+  }
+}</code></pre>
+            </div>
 
-          <h3 class="text-xl font-semibold text-white mt-6 mb-3">Cursor</h3>
-          <ol class="list-decimal pl-6 space-y-2 text-gray-300">
-            <li>
-              Press
-              <strong class="font-semibold text-white">Cmd + Shift + J</strong>
-              to open Settings
-            </li>
-            <li>
-              Select <strong class="font-semibold text-white">MCP Tools</strong>
-            </li>
-            <li>
-              Select
-              <strong class="font-semibold text-white">
-                + New MCP server</strong
-              >
-            </li>
-          </ol>
+            <div class="mb-4">
+              <h4 class="text-lg font-medium text-white mb-2">Cursor</h4>
+              <ol class="list-decimal pl-4 space-y-1 text-gray-300 text-sm">
+                <li>Press <kbd class="bg-gray-700 px-1 rounded">Cmd/Ctrl + Shift + J</kbd></li>
+                <li>Select <strong>MCP Tools</strong></li>
+                <li>Click <strong>+ New MCP server</strong></li>
+                <li>Enter the server URL above</li>
+              </ol>
+            </div>
 
-          <h3 class="text-xl font-semibold text-white mt-6 mb-3">VSCode</h3>
-          <p class="mb-2 text-gray-300">
-            Read more
-            <a
-              href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers"
-              class="hover:text-primary"
-              >here</a
-            >
-          </p>
-          <p class="text-gray-400">Note: Requires VSCode 1.99 or above</p>
-        </div>
+            <div>
+              <h4 class="text-lg font-medium text-white mb-2">Windsurf</h4>
+              <ol class="list-decimal pl-4 space-y-1 text-gray-300 text-sm">
+                <li>Open Settings</li>
+                <li>Navigate to <strong>Cascade</strong> → <strong>Model Context Provider Servers</strong></li>
+                <li>Select <strong>Add Server</strong></li>
+                <li>Configure with the URL above</li>
+              </ol>
+            </div>
+          </div>
 
-        <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
-          Available Tools
-        </h2>
-        <div class="card rounded-lg p-6 mb-6">
-          <p class="text-gray-300 mb-4">
-            This MCP server provides various tools and capabilities. Connect
-            through your IDE to discover the available tools and their
-            functionality.
-          </p>
-          <div class="mt-3 bg-gray-700 p-4 rounded">
-            <p class="font-semibold mb-2 text-white">How to explore tools:</p>
-            <ul class="list-disc pl-6 space-y-1 text-gray-300">
-              <li>
-                Connect the server to your IDE using the configuration above
-              </li>
-              <li>Use your AI assistant to ask "What tools are available?"</li>
-              <li>
-                Explore tool capabilities through natural language queries
-              </li>
-            </ul>
+          <!-- CLI Tools -->
+          <div class="card rounded-lg p-6">
+            <h3 class="text-xl font-semibold text-white mb-4">⚡ CLI & Debugging</h3>
+            
+            <div class="mb-4">
+              <h4 class="text-lg font-medium text-white mb-2">MCP Remote</h4>
+              <p class="text-gray-300 text-sm mb-2">Connect directly via command line:</p>
+              <pre class="text-sm"><code>npx @modelcontextprotocol/cli remote <span id="remote-url"></span></code></pre>
+            </div>
+
+            <div class="mb-4">
+              <h4 class="text-lg font-medium text-white mb-2">MCP Inspector</h4>
+              <p class="text-gray-300 text-sm mb-2">Debug and test the server:</p>
+              <pre class="text-sm"><code>npx @modelcontextprotocol/inspector \
+  --url <span id="inspector-url"></span></code></pre>
+            </div>
+
+            <div class="mb-4">
+              <h4 class="text-lg font-medium text-white mb-2">Claude Desktop</h4>
+              <p class="text-gray-300 text-sm mb-2">Add to <code class="bg-gray-700 px-1 rounded">claude_desktop_config.json</code>:</p>
+              <pre class="text-sm"><code>{
+  "mcpServers": {
+    "test-server": {
+      "url": "<span id="claude-url"></span>"
+    }
+  }
+}</code></pre>
+            </div>
+
+            <div>
+              <h4 class="text-lg font-medium text-white mb-2">cURL Test</h4>
+              <p class="text-gray-300 text-sm mb-2">Test server availability:</p>
+              <pre class="text-sm"><code>curl -X POST <span id="curl-url"></span> \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}'</code></pre>
+            </div>
           </div>
         </div>
 
         <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
-          Example Workflows
+          Server Features
         </h2>
         <div class="card rounded-lg p-6 mb-6">
-          <div class="bg-gray-700 rounded-lg p-4 mb-4">
-            <h4 class="text-lg font-semibold text-white mb-2">
-              Discover Capabilities
-            </h4>
-            <p class="text-gray-300">
-              "What tools and resources does this MCP server provide?"
-            </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-2xl mb-2">🔒</div>
+              <h4 class="text-lg font-semibold text-white mb-2">Authenticated Access</h4>
+              <p class="text-gray-300 text-sm">Descope-powered authentication with scope-based permissions</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-2xl mb-2">⚡</div>
+              <h4 class="text-lg font-semibold text-white mb-2">Serverless</h4>
+              <p class="text-gray-300 text-sm">Stateless operation with persistent configuration via Netlify Blobs</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-2xl mb-2">🔧</div>
+              <h4 class="text-lg font-semibold text-white mb-2">Configurable</h4>
+              <p class="text-gray-300 text-sm">Dynamic configuration through UI with no deployment required</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-2xl mb-2">🧪</div>
+              <h4 class="text-lg font-semibold text-white mb-2">Testing Tools</h4>
+              <p class="text-gray-300 text-sm">GitHub repository management and API integration examples</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-2xl mb-2">🌐</div>
+              <h4 class="text-lg font-semibold text-white mb-2">HTTP Transport</h4>
+              <p class="text-gray-300 text-sm">Streamable HTTP with OAuth 2.0 protected resource metadata</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-2xl mb-2">🔍</div>
+              <h4 class="text-lg font-semibold text-white mb-2">Development Ready</h4>
+              <p class="text-gray-300 text-sm">Built-in debugging support and comprehensive error handling</p>
+            </div>
           </div>
-          <div class="bg-gray-700 rounded-lg p-4 mb-4">
-            <h4 class="text-lg font-semibold text-white mb-2">
-              Tool Exploration
-            </h4>
-            <p class="text-gray-300">
-              "How can I use the available tools to help with my task?"
-            </p>
-          </div>
-          <div class="bg-gray-700 rounded-lg p-4">
-            <h4 class="text-lg font-semibold text-white mb-2">
-              Integration Testing
-            </h4>
-            <p class="text-gray-300">
-              "Test the connection and functionality of this MCP server"
-            </p>
+        </div>
+
+        <h2 class="text-2xl font-bold font-heading text-white mt-8 mb-4">
+          Getting Started
+        </h2>
+        <div class="card rounded-lg p-6 mb-6">
+          <div class="space-y-4">
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
+              <div>
+                <h4 class="font-semibold text-white mb-1">Configure Authentication</h4>
+                <p class="text-gray-300 text-sm">Set your Descope Project ID and Base URL in the configuration section above</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
+              <div>
+                <h4 class="font-semibold text-white mb-1">Choose Integration Method</h4>
+                <p class="text-gray-300 text-sm">Pick from IDE integration, CLI tools, or direct API access based on your needs</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+              <div>
+                <h4 class="font-semibold text-white mb-1">Test Connection</h4>
+                <p class="text-gray-300 text-sm">Use the cURL command or MCP Inspector to verify the server is working</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
+              <div>
+                <h4 class="font-semibold text-white mb-1">Explore Available Tools</h4>
+                <p class="text-gray-300 text-sm">Ask your AI assistant: "What tools does this MCP server provide?"</p>
+              </div>
+            </div>
           </div>
         </div>
 
