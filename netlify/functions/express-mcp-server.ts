@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { descopeMcpBearerAuth, DescopeMcpProvider } from "@descope/mcp-express";
 import { createServer } from "./create-server.js";
+import { getStore } from "@netlify/blobs";
 
 // Type declarations
 declare global {
@@ -23,11 +24,55 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
-// In-memory storage for UI configuration (in production, you might want to use a database)
-let uiConfig = {
-  projectId: '',
-  baseUrl: 'https://api.descope.com'
-};
+// Blob storage for configuration
+const configStore = getStore('descope-config');
+const CONFIG_KEY = 'settings';
+
+// Configuration interface
+interface DescopeConfig {
+  projectId: string;
+  baseUrl: string;
+}
+
+// Load configuration from Netlify Blobs with fallbacks
+async function loadConfig(): Promise<DescopeConfig> {
+  try {
+    // Try to load from Netlify Blobs first
+    const blobData = await configStore.get(CONFIG_KEY, { type: 'text' });
+    if (blobData) {
+      const blobConfig = JSON.parse(blobData);
+      console.log('Loaded config from blobs:', blobConfig);
+      return {
+        projectId: blobConfig.projectId || process.env.DESCOPE_PROJECT_ID || '',
+        baseUrl: blobConfig.baseUrl || process.env.DESCOPE_BASE_URL || 'https://api.descope.com'
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to load config from blobs:', error);
+  }
+
+  // Fallback to environment variables
+  console.log('Using environment variable config');
+  return {
+    projectId: process.env.DESCOPE_PROJECT_ID || '',
+    baseUrl: process.env.DESCOPE_BASE_URL || 'https://api.descope.com'
+  };
+}
+
+// Save configuration to Netlify Blobs
+async function saveConfig(config: DescopeConfig): Promise<void> {
+  try {
+    await configStore.set(CONFIG_KEY, JSON.stringify(config), { 
+      metadata: { 
+        updatedAt: new Date().toISOString() 
+      }
+    });
+    console.log('Saved config to blobs:', config);
+  } catch (error) {
+    console.error('Failed to save config to blobs:', error);
+    throw error;
+  }
+}
 
 // Middleware setup
 app.use(express.json());
@@ -41,14 +86,43 @@ app.use(
 );
 app.options("*", cors());
 
-// const provider = new DescopeMcpProvider({
-//   verifyTokenOptions: {
-//     requiredScopes: ["app:read", "app:manage"],
-//   },
-// });
+// Create dynamic Descope MCP provider
+async function createProvider(): Promise<DescopeMcpProvider> {
+  const config = await loadConfig();
+  
+  const provider = new DescopeMcpProvider({
+    projectId: config.projectId,
+    baseUrl: config.baseUrl,
+    // managementKey: process.env.DESCOPE_MANAGEMENT_KEY, // Still from env for security
+    verifyTokenOptions: {
+      requiredScopes: ["app:read", "app:manage"],
+    },
+  });
+  
+  return provider;
+}
+
+// Dynamic auth middleware for MCP routes
+async function dynamicMcpAuth(req: Request, res: Response, next: any) {
+  try {
+    const provider = await createProvider();
+    const middleware = descopeMcpBearerAuth(provider);
+    middleware(req, res, next);
+  } catch (error) {
+    console.error('Error creating Descope provider:', error);
+    res.status(500).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32603,
+        message: "Authentication configuration error",
+      },
+      id: null,
+    });
+  }
+}
 
 // Auth middleware for session validation
-app.use(["/mcp"], descopeMcpBearerAuth());
+app.use(["/mcp"], dynamicMcpAuth);
 
 // Initialize transport
 const transport = new StreamableHTTPServerTransport({
@@ -115,7 +189,7 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 // Configuration API endpoints
-app.post("/api/config", (req: Request, res: Response) => {
+app.post("/api/config", async (req: Request, res: Response) => {
   try {
     const { projectId, baseUrl } = req.body;
     
@@ -124,29 +198,48 @@ app.post("/api/config", (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid configuration data" });
     }
     
-    // Update in-memory configuration
-    uiConfig.projectId = projectId.trim();
-    uiConfig.baseUrl = baseUrl.trim() || 'https://api.descope.com';
+    // Create configuration object
+    const config: DescopeConfig = {
+      projectId: projectId.trim(),
+      baseUrl: baseUrl.trim() || 'https://api.descope.com'
+    };
     
-    console.log('Configuration updated:', uiConfig);
+    // Save to Netlify Blobs
+    await saveConfig(config);
     
     res.json({ 
       success: true, 
-      config: uiConfig,
-      message: "Configuration updated successfully" 
+      config: config,
+      message: "Configuration saved successfully",
+      storage: "netlify-blobs"
     });
   } catch (error) {
     console.error('Error updating configuration:', error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ 
+      error: "Failed to save configuration",
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
-app.get("/api/config", (req: Request, res: Response) => {
-  // Return current configuration (without sensitive data)
-  res.json({
-    projectId: uiConfig.projectId || process.env.DESCOPE_PROJECT_ID || '',
-    baseUrl: uiConfig.baseUrl || process.env.DESCOPE_BASE_URL || 'https://api.descope.com'
-  });
+app.get("/api/config", async (_req: Request, res: Response) => {
+  try {
+    const config = await loadConfig();
+    res.json({
+      ...config,
+      storage: "netlify-blobs",
+      hasEnvFallback: {
+        projectId: !!process.env.DESCOPE_PROJECT_ID,
+        baseUrl: !!process.env.DESCOPE_BASE_URL
+      }
+    });
+  } catch (error) {
+    console.error('Error loading configuration:', error);
+    res.status(500).json({ 
+      error: "Failed to load configuration",
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
 });
 
 // OAuth Protected Resource Metadata endpoint
@@ -177,7 +270,7 @@ app.get(
 // OPTIONS handler for OAuth Protected Resource Metadata
 app.options(
   "/.well-known/oauth-protected-resource",
-  (req: Request, res: Response) => {
+  (_req: Request, res: Response) => {
     res.set({
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -191,20 +284,27 @@ app.options(
 // OAuth Authorization Server Metadata endpoint
 app.get(
   "/.well-known/oauth-authorization-server",
-  (req: Request, res: Response) => {
-    // Use UI configuration with environment variable fallback
-    const baseUrl = uiConfig.baseUrl || process.env.DESCOPE_BASE_URL || "https://api.descope.com";
-    const projectId = uiConfig.projectId || process.env.DESCOPE_PROJECT_ID;
+  async (_req: Request, res: Response) => {
+    try {
+      // Use blob configuration with environment variable fallback
+      const config = await loadConfig();
+      const { baseUrl, projectId } = config;
 
-    if (!projectId) {
-      return res.status(400).json({ 
-        error: "Project ID not configured. Please set it via the UI configuration or DESCOPE_PROJECT_ID environment variable." 
+      if (!projectId) {
+        return res.status(400).json({ 
+          error: "Project ID not configured. Please set it via the UI configuration or DESCOPE_PROJECT_ID environment variable." 
+        });
+      }
+
+      const redirectUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/openid-configuration`;
+
+      res.redirect(302, redirectUrl);
+    } catch (error) {
+      console.error('Error loading configuration for OAuth endpoint:', error);
+      res.status(500).json({ 
+        error: "Internal server error loading configuration" 
       });
     }
-
-    const redirectUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/openid-configuration`;
-
-    res.redirect(302, redirectUrl);
   }
 );
 

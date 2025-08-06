@@ -155,9 +155,30 @@
                   projectIdInput.value = serverConfig.projectId;
                   baseUrlInput.value = serverConfig.baseUrl || 'https://api.descope.com';
                 }
+                
+                // Show server configuration status
+                const storageInfo = serverConfig.storage || 'Unknown';
+                const hasEnvFallback = serverConfig.hasEnvFallback || {};
+                const envStatus = Object.entries(hasEnvFallback)
+                  .filter(([_, hasEnv]) => hasEnv)
+                  .map(([key, _]) => key)
+                  .join(', ');
+                
+                if (serverConfig.projectId || serverConfig.baseUrl !== 'https://api.descope.com') {
+                  showStatus(
+                    'Server configuration loaded',
+                    'info',
+                    `Storage: ${storageInfo}${envStatus ? ` | Env fallbacks: ${envStatus}` : ''}`
+                  );
+                }
               }
             } catch (serverError) {
               console.log('Server config not available:', serverError);
+              showStatus(
+                'Server configuration unavailable',
+                'error',
+                'Using local storage only'
+              );
             }
           } catch (error) {
             console.error('Error loading configuration:', error);
@@ -165,7 +186,7 @@
         }
 
         // Save configuration to localStorage
-        function saveConfig() {
+        async function saveConfig() {
           try {
             const config = {
               projectId: projectIdInput.value.trim(),
@@ -174,13 +195,12 @@
             };
             
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-            showStatus('Configuration saved successfully!', 'success');
             
-            // Also update server configuration via API
-            updateServerConfig(config);
+            // Also update server configuration via API (this will show its own status)
+            await updateServerConfig(config);
           } catch (error) {
             console.error('Error saving configuration:', error);
-            showStatus('Error saving configuration', 'error');
+            showStatus('Error saving configuration', 'error', error.message);
           }
         }
 
@@ -196,8 +216,19 @@
         }
 
         // Show status message
-        function showStatus(message, type) {
-          statusDiv.textContent = message;
+        function showStatus(message, type, details = null) {
+          statusDiv.innerHTML = `
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="font-medium">${message}</div>
+                ${details ? `<div class="text-sm opacity-90 mt-1">${details}</div>` : ''}
+              </div>
+              <button onclick="this.parentElement.parentElement.parentElement.classList.add('hidden')" 
+                      class="text-white hover:opacity-75">
+                ✕
+              </button>
+            </div>
+          `;
           statusDiv.className = `p-3 rounded-md mb-4 ${
             type === 'success' ? 'bg-green-600 text-white' :
             type === 'error' ? 'bg-red-600 text-white' :
@@ -205,23 +236,43 @@
           }`;
           statusDiv.classList.remove('hidden');
           
-          setTimeout(() => {
-            statusDiv.classList.add('hidden');
-          }, 3000);
+          if (!details) {
+            setTimeout(() => {
+              statusDiv.classList.add('hidden');
+            }, 3000);
+          }
         }
 
         // Update server configuration via API
-        function updateServerConfig(config) {
-          fetch('/api/config', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(config)
-          }).catch(error => {
-            console.log('Server config update not available:', error);
-            // This is expected if the endpoint doesn't exist yet
-          });
+        async function updateServerConfig(config) {
+          try {
+            const response = await fetch('/api/config', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(config)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+              showStatus(
+                result.message || 'Configuration updated successfully!', 
+                'success',
+                `Stored in: ${result.storage || 'Netlify Blobs'}`
+              );
+            } else {
+              throw new Error(result.error || 'Unknown error');
+            }
+          } catch (error) {
+            console.error('Server config update failed:', error);
+            showStatus(
+              'Failed to update server configuration', 
+              'error',
+              error.message || 'Check console for details'
+            );
+          }
         }
 
         // Event listeners
