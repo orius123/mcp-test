@@ -46,6 +46,30 @@ const provider = new DescopeMcpProvider({
   },
 });
 
+app.get(
+  "/.well-known/oauth-protected-resource",
+  (req: Request, res: Response) => {
+    const baseUrl =
+      process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`;
+
+    const metadata = {
+      resource: `${baseUrl}/mcp`,
+      authorization_servers: [baseUrl],
+      bearer_methods_supported: ["header"],
+      resource_documentation: `${baseUrl}/docs`,
+    };
+
+    res.set({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Authorization, MCP-Protocol-Version",
+    });
+
+    res.json(metadata);
+  }
+);
+
 // Auth middleware for session validation
 app.use(descopeMcpAuthRouter(undefined, provider));
 
