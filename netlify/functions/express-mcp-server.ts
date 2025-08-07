@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { descopeMcpBearerAuth, DescopeMcpProvider } from "@descope/mcp-express";
 import { createServer } from "./create-server.js";
+import { getBaseUrl, getProjectId } from "./config-store.js";
 
 // Type declarations
 declare global {
@@ -150,9 +151,9 @@ app.options(
 // OAuth Authorization Server Metadata endpoint
 app.get(
   "/.well-known/oauth-authorization-server",
-  (req: Request, res: Response) => {
-    const baseUrl = process.env.DESCOPE_BASE_URL || "https://api.descope.com";
-    const projectId = process.env.DESCOPE_PROJECT_ID;
+  async (req: Request, res: Response) => {
+    const baseUrl = await getBaseUrl();
+    const projectId = await getProjectId();
 
     const redirectUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/openid-configuration`;
 
