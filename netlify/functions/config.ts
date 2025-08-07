@@ -1,5 +1,9 @@
 import { Handler } from "@netlify/functions";
-import { getDescopeConfig, setDescopeConfig, DescopeConfig } from "./config-store.js";
+import {
+  getDescopeConfig,
+  setDescopeConfig,
+  DescopeConfig,
+} from "./config-store.js";
 
 // CORS headers
 const corsHeaders = {
@@ -41,7 +45,7 @@ const handleGet = async () => {
 const handlePut = async (body: string) => {
   try {
     const config: DescopeConfig = JSON.parse(body);
-    
+
     // Validate the configuration
     if (config.baseUrl && typeof config.baseUrl !== "string") {
       return {
@@ -50,7 +54,7 @@ const handlePut = async (body: string) => {
         body: JSON.stringify({ error: "baseUrl must be a string" }),
       };
     }
-    
+
     if (config.projectId && typeof config.projectId !== "string") {
       return {
         statusCode: 400,
@@ -58,20 +62,38 @@ const handlePut = async (body: string) => {
         body: JSON.stringify({ error: "projectId must be a string" }),
       };
     }
-    
+
     await setDescopeConfig(config);
     const updatedConfig = await getDescopeConfig();
-    
+
     return {
       statusCode: 200,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(updatedConfig),
+      body: JSON.stringify({
+        ...updatedConfig,
+        _warning: "Configuration saved but Netlify Blobs may not be available. Settings may not persist between deployments."
+      }),
     };
   } catch (error) {
     console.error("Error updating configuration:", error);
+    
+    // Check if this is a Netlify Blobs configuration issue
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("MissingBlobsEnvironmentError")) {
+      return {
+        statusCode: 202, // Accepted but with limitations
+        headers: corsHeaders,
+        body: JSON.stringify({ 
+          error: "Netlify Blobs not configured. Configuration cannot be persisted.", 
+          fallback: "Using environment variables as fallback.",
+          config: await getDescopeConfig() // Return current config from env vars
+        }),
+      };
+    }
+    
     return {
       statusCode: 500,
       headers: corsHeaders,
@@ -83,7 +105,7 @@ const handlePut = async (body: string) => {
 // Main handler
 export const handler: Handler = async (event) => {
   const method = event.httpMethod;
-  
+
   switch (method) {
     case "OPTIONS":
       return handleOptions();

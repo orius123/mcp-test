@@ -14,7 +14,13 @@ const DEFAULT_CONFIG: DescopeConfig = {
 
 // Get the blob store for configuration
 function getConfigStore() {
-  return getStore("descope-config");
+  try {
+    // Use the store name directly - Netlify should handle the environment automatically
+    return getStore("descope-config");
+  } catch (error) {
+    console.error("Failed to create blob store:", error);
+    throw new Error("Unable to initialize Netlify Blobs storage. This feature requires deployment to Netlify.");
+  }
 }
 
 // Get configuration from blob storage
@@ -22,17 +28,21 @@ export async function getDescopeConfig(): Promise<DescopeConfig> {
   try {
     const store = getConfigStore();
     const config = await store.get("config", { type: "json" });
-    
+
     if (!config) {
       return DEFAULT_CONFIG;
     }
-    
+
     return {
       ...DEFAULT_CONFIG,
       ...config,
     };
   } catch (error) {
-    console.warn("Failed to load configuration from blobs, using defaults:", error);
+    console.warn(
+      "Failed to load configuration from blobs, using defaults:",
+      error
+    );
+    // If blobs are not available, return defaults (environment variables will be used as fallback)
     return DEFAULT_CONFIG;
   }
 }
@@ -46,11 +56,12 @@ export async function setDescopeConfig(config: DescopeConfig): Promise<void> {
       ...currentConfig,
       ...config,
     };
-    
+
     await store.set("config", JSON.stringify(newConfig));
   } catch (error) {
     console.error("Failed to save configuration to blobs:", error);
-    throw error;
+    // Don't throw error - this allows the app to continue working with env vars
+    console.warn("Configuration will not be persisted. Using environment variables as fallback.");
   }
 }
 
@@ -63,5 +74,7 @@ export async function getProjectId(): Promise<string | undefined> {
 // Get base URL (with fallback to environment variable for backward compatibility)
 export async function getBaseUrl(): Promise<string> {
   const config = await getDescopeConfig();
-  return config.baseUrl || process.env.DESCOPE_BASE_URL || DEFAULT_CONFIG.baseUrl!;
+  return (
+    config.baseUrl || process.env.DESCOPE_BASE_URL || DEFAULT_CONFIG.baseUrl!
+  );
 }
