@@ -42,6 +42,7 @@ const provider = new DescopeMcpProvider({
   },
   dynamicClientRegistrationOptions: {
     authPageUrl: "https://bs.com",
+    nonConfidentialClient: true,
   },
 });
 
