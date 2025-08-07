@@ -35,14 +35,18 @@ app.use(
 );
 app.options("*", cors());
 
-// const provider = new DescopeMcpProvider({
-//   verifyTokenOptions: {
-//     requiredScopes: ["app:read", "app:manage"],
-//   },
-// });
+const provider = new DescopeMcpProvider({
+  authorizationServerOptions: {
+    isDisabled: false,
+    enableDynamicClientRegistration: true,
+  },
+  dynamicClientRegistrationOptions: {
+    authPageUrl: "https://bs.com",
+  },
+});
 
 // Auth middleware for session validation
-app.use(["/mcp"], descopeMcpBearerAuth());
+app.use(["/mcp"], descopeMcpBearerAuth(provider));
 
 // Initialize transport
 const transport = new StreamableHTTPServerTransport({
