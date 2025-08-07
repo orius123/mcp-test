@@ -35,14 +35,18 @@ app.use(
 );
 app.options("*", cors());
 
-// const provider = new DescopeMcpProvider({
-//   verifyTokenOptions: {
-//     requiredScopes: ["app:read", "app:manage"],
-//   },
-// });
+const provider = new DescopeMcpProvider({
+  authorizationServerOptions: {
+    isDisabled: false,
+    enableDynamicClientRegistration: true,
+  },
+  dynamicClientRegistrationOptions: {
+    authPageUrl: "https://bs.com",
+  },
+});
 
 // Auth middleware for session validation
-app.use(["/mcp"], descopeMcpBearerAuth());
+app.use(["/mcp"], descopeMcpBearerAuth(provider));
 
 // Initialize transport
 const transport = new StreamableHTTPServerTransport({
@@ -154,9 +158,35 @@ app.get(
     const baseUrl = process.env.DESCOPE_BASE_URL || "https://api.descope.com";
     const projectId = process.env.DESCOPE_PROJECT_ID;
 
-    const redirectUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/openid-configuration`;
-
-    res.redirect(302, redirectUrl);
+    const wellKnownUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/openid-configuration`;
+    //fetch the well-known configuration
+    fetch(wellKnownUrl)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch well-known configuration");
+        }
+        return response.json();
+      })
+      .then((data) => {
+        // Process the well-known configuration data
+        console.log("Well-known configuration:", data);
+        // replace the registration_endpoint with the current server url
+        data.registration_endpoint = `${req.protocol}://${req.get(
+          "host"
+        )}/register`;
+        res.json(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching well-known configuration:", error);
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32603,
+            message: "Internal server error",
+          },
+          id: null,
+        });
+      });
   }
 );
 
