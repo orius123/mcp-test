@@ -35,17 +35,6 @@ app.use(
 );
 app.options("*", cors());
 
-const provider = new DescopeMcpProvider({
-  authorizationServerOptions: {
-    isDisabled: false,
-    enableDynamicClientRegistration: true,
-  },
-  dynamicClientRegistrationOptions: {
-    authPageUrl: "https://bs.com",
-    nonConfidentialClient: true,
-  },
-});
-
 app.get(
   "/.well-known/oauth-protected-resource",
   (req: Request, res: Response) => {
@@ -59,16 +48,19 @@ app.get(
       resource_documentation: `${baseUrl}/docs`,
     };
 
-    res.set({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, MCP-Protocol-Version",
-    });
-
     res.json(metadata);
   }
 );
+
+const provider = new DescopeMcpProvider({
+  authorizationServerOptions: {
+    isDisabled: false,
+    enableDynamicClientRegistration: true,
+  },
+  dynamicClientRegistrationOptions: {
+    nonConfidentialClient: true,
+  },
+});
 
 // Auth middleware for session validation
 app.use(descopeMcpAuthRouter(undefined, provider));
