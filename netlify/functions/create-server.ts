@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import createSdk from "@descope/node-sdk";
+import { getProjectId } from "./config-store.js";
 
 const NWS_API_BASE = "https://api.weather.gov";
 const USER_AGENT = "weather-app/1.0";
@@ -167,13 +168,14 @@ export const createServer = () => {
       const userId = getSubFromJwt(authInfo.token);
       console.log("Going to fetch token with: ", { appId: "github", userId });
 
+      const projectId = await getProjectId();
       const response = await fetch(
         "https://api.descope.com/v1/mgmt/outbound/app/user/token/latest",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.DESCOPE_PROJECT_ID}:${authInfo.token}`,
+            Authorization: `Bearer ${projectId}:${authInfo.token}`,
           },
           body: JSON.stringify({ appId: "github", userId }),
         }
@@ -322,13 +324,14 @@ export const createServer = () => {
       const userId = getSubFromJwt(authInfo.token);
       console.log("Going to fetch token with: ", { appId: "github", userId });
 
+      const projectId = await getProjectId();
       const response = await fetch(
         "https://api.descope.com/v1/mgmt/outbound/app/user/token/latest",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.DESCOPE_PROJECT_ID}:${authInfo.token}`,
+            Authorization: `Bearer ${projectId}:${authInfo.token}`,
           },
           body: JSON.stringify({ appId: "github", userId }),
         }
