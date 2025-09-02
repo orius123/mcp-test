@@ -175,7 +175,7 @@ app.get(
     const baseUrl = process.env.DESCOPE_BASE_URL || "https://api.descope.com";
     const projectId = process.env.DESCOPE_PROJECT_ID;
 
-    const wellKnownUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/openid-configuration`;
+    const wellKnownUrl = `${baseUrl}/v1/apps/${projectId}/.well-known/oauth-authorization-server`;
     //fetch the well-known configuration
     fetch(wellKnownUrl)
       .then((response) => {
