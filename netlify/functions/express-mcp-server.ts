@@ -187,10 +187,6 @@ app.get(
       .then((data) => {
         // Process the well-known configuration data
         console.log("Well-known configuration:", data);
-        // replace the registration_endpoint with the current server url
-        data.registration_endpoint = `${req.protocol}://${req.get(
-          "host"
-        )}/register`;
         res.json(data);
       })
       .catch((error) => {
