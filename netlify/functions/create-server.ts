@@ -155,7 +155,7 @@ export const createServer = () => {
         authInfo
       );
       if (!authInfo?.scopes.includes("app:read")) {
-        console.log("You are not authorized");
+        console.log("You are not authorized, missing 'app:read' scope");
         throw new McpError(
           ErrorCode.InvalidRequest,
           "Insufficient permissions: 'app:read' scope required"
